@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  JDBS Server – Logback configuration
+  ════════════════════════════════════
+  This configures the *server's own* internal log output (accept loop, client
+  events, etc.).  It is NOT the config for applications that use JDBS clients.
+
+  Appenders
+  ─────────
+  CONSOLE  – human-readable, ANSI-coloured output to stdout
+  FILE     – rolling daily file under ${user.home}/.jdbs/logs/
+
+  Root level
+  ──────────
+  Set to INFO by default.  Override at runtime with:
+    -Dlogging.level.root=DEBUG
+  or for a single package:
+    -Dlogging.level.org.tauasa.apps.jdbs=TRACE
+-->
+<configuration scan="true" scanPeriod="30 seconds">
+
+  <!-- ── Properties ──────────────────────────────────────────────────────── -->
+  <property name="LOG_DIR"     value="${user.home}/.jdbs/logs"/>
+  <property name="LOG_FILE"    value="jdbs-server"/>
+  <property name="MAX_HISTORY" value="14"/>   <!-- days of rolling logs to keep -->
+  <property name="MAX_SIZE"    value="20MB"/>  <!-- max size per log file        -->
+
+  <!-- Pattern used by the console appender (with ANSI colours) -->
+  <property name="CONSOLE_PATTERN"
+            value="%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%-40.40logger{39}) %msg%n"/>
+
+  <!-- Pattern used by the file appender (no ANSI codes) -->
+  <property name="FILE_PATTERN"
+            value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %-40.40logger{39} - %msg%n"/>
+
+  <!-- ── Appenders ────────────────────────────────────────────────────────── -->
+
+  <!--
+    CONSOLE – writes to System.out.
+    withJansi="true" enables ANSI colours on Windows if jansi is on the classpath.
+  -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.out</target>
+    <withJansi>false</withJansi>
+    <encoder>
+      <pattern>${CONSOLE_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!--
+    FILE – time-based rolling: one file per day, kept for MAX_HISTORY days.
+    Also rolls when a single file exceeds MAX_SIZE.
+  -->
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_DIR}/${LOG_FILE}.log</file>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <!-- e.g. ~/.jdbs/logs/jdbs-server.2024-11-05.1.log.gz -->
+      <fileNamePattern>${LOG_DIR}/${LOG_FILE}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <maxFileSize>${MAX_SIZE}</maxFileSize>
+      <maxHistory>${MAX_HISTORY}</maxHistory>
+      <totalSizeCap>200MB</totalSizeCap>
+    </rollingPolicy>
+
+    <encoder>
+      <pattern>${FILE_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!--
+    ASYNC FILE – wraps FILE in an async appender so the accept/handler threads
+    are never blocked by I/O.  The queue depth of 512 means up to 512 log
+    events can be buffered before back-pressure kicks in.
+  -->
+  <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+    <queueSize>512</queueSize>
+    <discardingThreshold>0</discardingThreshold>  <!-- never discard -->
+    <includeCallerData>false</includeCallerData>
+    <appender-ref ref="FILE"/>
+  </appender>
+
+  <!-- ── Logger overrides ─────────────────────────────────────────────────── -->
+
+  <!-- Keep Netty / Jetty (if ever added) quiet unless something goes wrong -->
+  <logger name="io.netty"         level="WARN"/>
+  <logger name="org.eclipse.jetty" level="WARN"/>
+
+  <!-- JDBS server internals at DEBUG while TRACE is very noisy -->
+  <logger name="org.tauasa.apps.jdbs" level="DEBUG"/>
+
+  <!-- Silence Jackson's internal mapper chatter -->
+  <logger name="com.fasterxml.jackson" level="WARN"/>
+
+  <!-- ── Root ─────────────────────────────────────────────────────────────── -->
+  <root level="${logging.level.root:-INFO}">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="ASYNC_FILE"/>
+  </root>
+
+</configuration>

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.tauasa.apps</groupId>
+  <artifactId>jdbs-parent</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <name>JDBS Parent</name>
+  <description>Java Debug Bridge Server – multi-module parent POM</description>
+
+  <modules>
+    <module>jdbs-server</module>
+    <module>jdbs-client</module>
+  </modules>
+
+  <properties>
+    <java.version>17</java.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- Dependency versions -->
+    <javafx.version>21.0.3</javafx.version>
+    <jackson.version>2.17.1</jackson.version>
+    <slf4j.version>2.0.13</slf4j.version>
+    <logback.version>1.5.6</logback.version>
+    <log4j.version>2.23.1</log4j.version>
+
+    <!-- Plugin versions -->
+    <maven-compiler.version>3.13.0</maven-compiler.version>
+    <maven-shade.version>3.5.3</maven-shade.version>
+    <maven-jar.version>3.4.1</maven-jar.version>
+    <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+
+    <!--
+      JavaFX platform classifier.  Set automatically by the OS-detection
+      profiles below, or override manually:
+        mvn package -Djavafx.platform=mac-aarch64   (Apple Silicon)
+        mvn package -Djavafx.platform=linux-aarch64 (Linux ARM64)
+    -->
+    <javafx.platform>linux</javafx.platform>
+  </properties>
+
+  <!--
+    ═══════════════════════════════════════════════════════════════════
+    OS-detection profiles – auto-select the correct JavaFX native jar
+    classifier without requiring the os-maven-plugin extension.
+
+    Maven evaluates ALL active profiles; the three mutually-exclusive
+    families (windows / mac / linux) guarantee exactly one fires.
+
+    If you prefer the os-maven-plugin approach instead, replace these
+    profiles with the extension and use ${os.detected.classifier}:
+
+      <build>
+        <extensions>
+          <extension>
+            <groupId>kr.motd.maven</groupId>
+            <artifactId>os-maven-plugin</artifactId>
+            <version>1.7.1</version>
+          </extension>
+        </extensions>
+      </build>
+    ═══════════════════════════════════════════════════════════════════
+  -->
+  <profiles>
+    <profile>
+      <id>javafx-windows</id>
+      <activation>
+        <os><family>windows</family></os>
+      </activation>
+      <properties>
+        <javafx.platform>win</javafx.platform>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>javafx-mac</id>
+      <activation>
+        <os><family>mac</family></os>
+      </activation>
+      <properties>
+        <!-- Covers both x86-64 and aarch64 Macs at the cost of using the
+             x86-64 jar on Apple Silicon; use -Djavafx.platform=mac-aarch64
+             to get the native ARM build on M-series Macs. -->
+        <javafx.platform>mac</javafx.platform>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>javafx-linux</id>
+      <activation>
+        <!-- Activate when neither windows nor mac matched -->
+        <os><name>Linux</name></os>
+      </activation>
+      <properties>
+        <javafx.platform>linux</javafx.platform>
+      </properties>
+    </profile>
+  </profiles>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler.version}</version>
+          <configuration>
+            <release>17</release>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven-jar.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${maven-shade.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.openjfx</groupId>
+          <artifactId>javafx-maven-plugin</artifactId>
+          <version>${javafx-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

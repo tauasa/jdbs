@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.tauasa.apps</groupId>
+    <artifactId>jdbs-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <artifactId>jdbs-server</artifactId>
+  <name>JDBS Server</name>
+  <description>Java Debug Bridge Server – GUI (JavaFX) and CLI application</description>
+
+  <dependencies>
+    <!--
+      JavaFX: pull BOTH the cross-platform jar (compile-time API) and the
+      platform-specific jar (runtime natives).  The os-maven-plugin in the
+      parent resolves ${os.detected.classifier} to "linux", "win", or "mac".
+    -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${os.detected.classifier}</classifier>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${os.detected.classifier}</classifier>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-graphics</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-graphics</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${os.detected.classifier}</classifier>
+    </dependency>
+
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-base</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-base</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${os.detected.classifier}</classifier>
+    </dependency>
+
+    <!-- Jackson -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <!-- SLF4J + Logback for server's own internal logging -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- ── javafx:run (dev-time GUI launch, no fat-jar needed) ── -->
+      <plugin>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>org.tauasa.apps.jdbs.Main</mainClass>
+          <options>
+            <option>--add-opens=javafx.base/com.sun.javafx.reflect=ALL-UNNAMED</option>
+          </options>
+        </configuration>
+      </plugin>
+
+      <!--
+        ── maven-shade-plugin ──────────────────────────────────────
+        Produces two jars:
+          jdbs-server-1.0.0.jar          – thin jar (original, no deps)
+          jdbs-server-1.0.0-fat.jar      – fat jar with all deps bundled
+
+        The fat jar works as:
+          java -jar jdbs-server-1.0.0-fat.jar            (GUI mode)
+          java -jar jdbs-server-1.0.0-fat.jar ‑‑cli      (headless CLI)
+
+        NOTE: JavaFX native libs land in the root of the fat jar so the
+        built-in classloader can find them at runtime without any extra
+        java.library.path tricks.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>fat-jar</id>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <!-- Attach the fat jar as a secondary artifact rather than
+                   replacing the thin jar produced by maven-jar-plugin. -->
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>fat</shadedClassifierName>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+
+              <transformers>
+                <!-- Set the main class in the fat-jar manifest -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>org.tauasa.apps.jdbs.Main</mainClass>
+                  <manifestEntries>
+                    <!-- Required by JavaFX when running from a plain jar -->
+                    <Add-Opens>javafx.base/com.sun.javafx.reflect ALL-UNNAMED</Add-Opens>
+                  </manifestEntries>
+                </transformer>
+
+                <!-- Merge META-INF/services/* so SPI registrations survive shading -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+
+                <!-- Merge Logback's janino / groovy config files if present -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                  <resource>META-INF/spring.handlers</resource>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                  <resource>META-INF/spring.schemas</resource>
+                </transformer>
+              </transformers>
+
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <!-- Drop existing per-jar manifests and signatures -->
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <!-- Module-info breaks unnamed-module fat jars -->
+                    <exclude>module-info.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

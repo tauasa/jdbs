@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ════════════════════════════════════════════════════════════════════
+  JDBS Client – example Log4j2 configuration
+  ════════════════════════════════════════════════════════════════════
+
+  Copy this file to your application's src/main/resources/ and rename
+  it to log4j2.xml (or log4j2-<env>.xml for environment-specific config).
+
+  The `packages` attribute on <Configuration> tells Log4j2 to scan the
+  JDBS package for the @Plugin-annotated JdbsLog4j2Appender class.
+  ════════════════════════════════════════════════════════════════════
+-->
+<Configuration status="WARN"
+               packages="org.tauasa.apps.jdbs.client.log4j">
+
+  <Appenders>
+
+    <!-- Standard console appender (keep for local dev visibility) -->
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%t] %logger{36} – %msg%n"/>
+    </Console>
+
+    <!--
+      JDBS appender – forwards to the debug server.
+
+      Attributes:
+        name              – unique name for this appender (required)
+        host              – JDBS server hostname (default: localhost)
+        port              – JDBS server port    (default: 6218)
+        level             – minimum level to forward: TRACE | DEBUG | INFO | WARN | ERROR
+        reconnectDelayMs  – ms to wait before reconnect attempt on connection loss
+    -->
+    <Jdbs name="Jdbs"
+          host="localhost"
+          port="6218"
+          level="DEBUG"
+          reconnectDelayMs="5000"/>
+
+  </Appenders>
+
+  <Loggers>
+
+    <!-- Quiet noisy third-party libraries on the JDBS channel -->
+    <Logger name="org.springframework" level="WARN" additivity="false">
+      <AppenderRef ref="Console"/>
+      <AppenderRef ref="Jdbs"/>
+    </Logger>
+
+    <Logger name="com.zaxxer.hikari" level="WARN" additivity="false">
+      <AppenderRef ref="Console"/>
+    </Logger>
+
+    <Root level="DEBUG">
+      <AppenderRef ref="Console"/>
+      <AppenderRef ref="Jdbs"/>
+    </Root>
+
+  </Loggers>
+
+</Configuration>

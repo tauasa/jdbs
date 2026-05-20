@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ════════════════════════════════════════════════════════════════════
+  JDBS Client – example Logback configuration
+  ════════════════════════════════════════════════════════════════════
+
+  Copy this file to your application's src/main/resources/logback.xml.
+
+  The JdbsLogbackAppender is configured via JavaBean properties that
+  Logback's Joran XML parser sets automatically.
+  ════════════════════════════════════════════════════════════════════
+-->
+<configuration scan="true" scanPeriod="30 seconds">
+
+  <!-- ── Console appender (keep for local dev) ─────────────────────────── -->
+  <appender name="Console" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.out</target>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} – %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!--
+    ── JDBS appender ─────────────────────────────────────────────────────
+    Forwards log events to a running JDBS server over TCP.
+
+    Properties:
+      host              – JDBS server hostname  (default: localhost)
+      port              – JDBS server port      (default: 6218)
+      level             – minimum level to forward: TRACE | DEBUG | INFO | WARN | ERROR
+      reconnectDelayMs  – milliseconds before reconnect attempt on disconnect
+  -->
+  <appender name="JDBS"
+            class="org.tauasa.apps.jdbs.client.logback.JdbsLogbackAppender">
+    <host>localhost</host>
+    <port>6218</port>
+    <level>DEBUG</level>
+    <reconnectDelayMs>5000</reconnectDelayMs>
+  </appender>
+
+  <!--
+    ── ASYNC wrapper ─────────────────────────────────────────────────────
+    Wrap the JDBS appender in AsyncAppender so the TCP send never blocks
+    your application threads.  This is strongly recommended in production.
+  -->
+  <appender name="ASYNC_JDBS" class="ch.qos.logback.classic.AsyncAppender">
+    <queueSize>512</queueSize>
+    <discardingThreshold>0</discardingThreshold>
+    <includeCallerData>false</includeCallerData>
+    <appender-ref ref="JDBS"/>
+  </appender>
+
+  <!-- ── Logger overrides ───────────────────────────────────────────────── -->
+  <!-- Quiet noisy libraries so they don't flood the JDBS viewer -->
+  <logger name="org.springframework"    level="WARN"/>
+  <logger name="com.zaxxer.hikari"      level="WARN"/>
+  <logger name="org.hibernate"          level="WARN"/>
+  <logger name="com.fasterxml.jackson"  level="WARN"/>
+
+  <!-- ── Root ───────────────────────────────────────────────────────────── -->
+  <root level="DEBUG">
+    <appender-ref ref="Console"/>
+    <appender-ref ref="ASYNC_JDBS"/>
+  </root>
+
+</configuration>

@@ -1,0 +1,177 @@
+/* ================================================================
+ * JDBS – Dark Mode Stylesheet
+ * ================================================================ */
+
+.root {
+    -fx-base:            #2b2b2b;
+    -fx-background:      #1e1e1e;
+    -fx-control-inner-background: #2d2d2d;
+    -fx-text-fill:       #d4d4d4;
+    -fx-font-family:     "Segoe UI", "SF Pro Text", "Helvetica Neue", "Arial", sans-serif;
+    -fx-font-size:       13px;
+}
+
+/* ── Menu Bar ─────────────────────────────────────────────────── */
+.menu-bar {
+    -fx-background-color: #323232;
+    -fx-border-color: #1a1a1a;
+    -fx-border-width: 0 0 1 0;
+}
+.menu-bar .label { -fx-text-fill: #d4d4d4; }
+.menu-bar .menu:hover, .menu-bar .menu:focused {
+    -fx-background-color: #404040;
+}
+.context-menu {
+    -fx-background-color: #3c3c3c;
+    -fx-border-color: #555;
+}
+.menu-item:focused, .menu-item:hover {
+    -fx-background-color: #505050;
+}
+.menu-item .label { -fx-text-fill: #d4d4d4; }
+
+/* ── Toolbar ──────────────────────────────────────────────────── */
+.tool-bar {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #1a1a1a;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 8 4 8;
+    -fx-spacing: 6;
+}
+.tool-bar .label { -fx-text-fill: #aaaaaa; }
+
+/* ── Labels ───────────────────────────────────────────────────── */
+.label { -fx-text-fill: #d4d4d4; }
+
+/* ── Table ────────────────────────────────────────────────────── */
+.table-view {
+    -fx-background-color: #1e1e1e;
+    -fx-border-color: #3a3a3a;
+}
+.table-view .column-header-background {
+    -fx-background-color: #2d2d2d;
+}
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #1a1a1a;
+    -fx-border-width: 0 1 1 0;
+    -fx-text-fill: #aaaaaa;
+}
+.table-view .column-header .label { -fx-text-fill: #aaaaaa; }
+
+.table-row-cell {
+    -fx-background-color: #252525;
+    -fx-border-color: #2d2d2d;
+    -fx-border-width: 0 0 1 0;
+    -fx-text-fill: #d4d4d4;
+}
+.table-row-cell .text { -fx-fill: #d4d4d4; }
+.table-row-cell:odd  { -fx-background-color: #262626; }
+.table-row-cell:even { -fx-background-color: #222222; }
+.table-row-cell:selected {
+    -fx-background-color: #214283;
+    -fx-text-fill: #ffffff;
+}
+.table-row-cell:selected .text { -fx-fill: #ffffff; }
+
+/* Log-level row tints */
+.table-row-cell.row-trace { -fx-background-color: #2a2a2a; }
+.table-row-cell.row-debug { -fx-background-color: #1c2d3c; }
+.table-row-cell.row-info  { -fx-background-color: #1c2e1c; }
+.table-row-cell.row-warn  { -fx-background-color: #2e2800; }
+.table-row-cell.row-error { -fx-background-color: #3a1a1a; }
+
+.table-row-cell.row-trace:selected { -fx-background-color: #404040; }
+.table-row-cell.row-debug:selected { -fx-background-color: #1a4060; }
+.table-row-cell.row-info:selected  { -fx-background-color: #1a5030; }
+.table-row-cell.row-warn:selected  { -fx-background-color: #504000; }
+.table-row-cell.row-error:selected { -fx-background-color: #602020; }
+
+/* ── Status Bar ───────────────────────────────────────────────── */
+.status-bar {
+    -fx-background-color: #2a2a2a;
+    -fx-border-color: #1a1a1a;
+    -fx-border-width: 1 0 0 0;
+    -fx-font-size: 11px;
+    -fx-text-fill: #888888;
+}
+.status-bar .label { -fx-text-fill: #888888; }
+
+/* ── Text Area (detail pane) ──────────────────────────────────── */
+.text-area {
+    -fx-background-color: #252525;
+    -fx-border-color: #3a3a3a;
+    -fx-text-fill: #d4d4d4;
+    -fx-highlight-fill: #214283;
+}
+.text-area .content { -fx-background-color: #252525; }
+.text-area .text    { -fx-fill: #d4d4d4; }
+
+/* ── Combo Box ────────────────────────────────────────────────── */
+.combo-box-base {
+    -fx-background-color: #3c3c3c;
+    -fx-border-color: #555;
+    -fx-text-fill: #d4d4d4;
+}
+.combo-box-base .label { -fx-text-fill: #d4d4d4; }
+.combo-box-popup .list-view {
+    -fx-background-color: #3c3c3c;
+    -fx-border-color: #555;
+}
+.combo-box-popup .list-cell {
+    -fx-background-color: #3c3c3c;
+    -fx-text-fill: #d4d4d4;
+}
+.combo-box-popup .list-cell:hover,
+.combo-box-popup .list-cell:focused {
+    -fx-background-color: #505050;
+}
+
+/* ── Text Field ───────────────────────────────────────────────── */
+.text-field {
+    -fx-background-color: #3c3c3c;
+    -fx-border-color: #555;
+    -fx-text-fill: #d4d4d4;
+    -fx-prompt-text-fill: #666;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.button {
+    -fx-background-color: #3c3c3c;
+    -fx-border-color: #555;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-text-fill: #d4d4d4;
+    -fx-cursor: hand;
+}
+.button:hover   { -fx-background-color: #484848; }
+.button:pressed { -fx-background-color: #2a2a2a; }
+
+/* ── Scroll Bar ───────────────────────────────────────────────── */
+.scroll-bar:horizontal, .scroll-bar:vertical {
+    -fx-background-color: #252525;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #505050;
+    -fx-background-radius: 4;
+}
+.scroll-bar .thumb:hover { -fx-background-color: #666; }
+.scroll-bar .increment-button, .scroll-bar .decrement-button {
+    -fx-background-color: #252525;
+}
+
+/* ── Split Pane Divider ───────────────────────────────────────── */
+.split-pane > .split-pane-divider {
+    -fx-background-color: #3a3a3a;
+    -fx-padding: 2;
+}
+
+/* ── Separator ────────────────────────────────────────────────── */
+.separator .line { -fx-border-color: #444; }
+
+/* ── Dialog ───────────────────────────────────────────────────── */
+.dialog-pane {
+    -fx-background-color: #2b2b2b;
+}
+.dialog-pane .header-panel { -fx-background-color: #323232; }

@@ -1,0 +1,101 @@
+/* ================================================================
+ * JDBS – Light Mode Stylesheet
+ * ================================================================ */
+
+.root {
+    -fx-base:            #f5f5f5;
+    -fx-background:      #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-font-family:     "Segoe UI", "SF Pro Text", "Helvetica Neue", "Arial", sans-serif;
+    -fx-font-size:       13px;
+}
+
+/* ── Menu Bar ─────────────────────────────────────────────────── */
+.menu-bar {
+    -fx-background-color: #ececec;
+    -fx-border-color: #d0d0d0;
+    -fx-border-width: 0 0 1 0;
+}
+.menu-bar .menu:hover, .menu-bar .menu:focused {
+    -fx-background-color: #d4d4d4;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────── */
+.tool-bar {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #d8d8d8;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 8 4 8;
+    -fx-spacing: 6;
+}
+
+/* ── Table ────────────────────────────────────────────────────── */
+.table-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+}
+.table-view .column-header-background {
+    -fx-background-color: #efefef;
+}
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: #efefef;
+    -fx-border-color: #d8d8d8;
+    -fx-border-width: 0 1 1 0;
+}
+.table-row-cell {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #f0f0f0;
+    -fx-border-width: 0 0 1 0;
+}
+.table-row-cell:selected {
+    -fx-background-color: #cce5ff;
+    -fx-text-fill: #000000;
+}
+.table-row-cell:odd  { -fx-background-color: #f9f9f9; }
+.table-row-cell:even { -fx-background-color: #ffffff; }
+
+/* Log-level row tints (override odd/even) */
+.table-row-cell.row-trace { -fx-background-color: #f0f0f0; }
+.table-row-cell.row-debug { -fx-background-color: #eaf3fb; }
+.table-row-cell.row-info  { -fx-background-color: #eafaf1; }
+.table-row-cell.row-warn  { -fx-background-color: #fefdf0; }
+.table-row-cell.row-error { -fx-background-color: #fdf0ef; }
+
+.table-row-cell.row-trace:selected { -fx-background-color: #c0c8d0; }
+.table-row-cell.row-debug:selected { -fx-background-color: #b0d0e8; }
+.table-row-cell.row-info:selected  { -fx-background-color: #a0d8b8; }
+.table-row-cell.row-warn:selected  { -fx-background-color: #e0d080; }
+.table-row-cell.row-error:selected { -fx-background-color: #e0a0a0; }
+
+/* ── Status Bar ───────────────────────────────────────────────── */
+.status-bar {
+    -fx-background-color: #ececec;
+    -fx-border-color: #d0d0d0;
+    -fx-border-width: 1 0 0 0;
+    -fx-font-size: 11px;
+    -fx-text-fill: #555;
+}
+
+/* ── Text Area (detail pane) ──────────────────────────────────── */
+.text-area {
+    -fx-background-color: #fafafa;
+    -fx-border-color: #e0e0e0;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.button {
+    -fx-background-color: #e8e8e8;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+.button:hover   { -fx-background-color: #d8d8d8; }
+.button:pressed { -fx-background-color: #c8c8c8; }
+
+/* ── Split Pane Divider ───────────────────────────────────────── */
+.split-pane > .split-pane-divider {
+    -fx-background-color: #d8d8d8;
+    -fx-padding: 2;
+}
