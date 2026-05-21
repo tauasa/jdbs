@@ -18,8 +18,8 @@
   </modules>
 
   <properties>
-    <java.version>17</java.version>
-    <maven.compiler.release>17</maven.compiler.release>
+    <java.version>21</java.version>
+    <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Dependency versions -->
@@ -43,64 +43,6 @@
     -->
     <javafx.platform>linux</javafx.platform>
   </properties>
-
-  <!--
-    ═══════════════════════════════════════════════════════════════════
-    OS-detection profiles – auto-select the correct JavaFX native jar
-    classifier without requiring the os-maven-plugin extension.
-
-    Maven evaluates ALL active profiles; the three mutually-exclusive
-    families (windows / mac / linux) guarantee exactly one fires.
-
-    If you prefer the os-maven-plugin approach instead, replace these
-    profiles with the extension and use ${os.detected.classifier}:
-
-      <build>
-        <extensions>
-          <extension>
-            <groupId>kr.motd.maven</groupId>
-            <artifactId>os-maven-plugin</artifactId>
-            <version>1.7.1</version>
-          </extension>
-        </extensions>
-      </build>
-    ═══════════════════════════════════════════════════════════════════
-  -->
-  <profiles>
-    <profile>
-      <id>javafx-windows</id>
-      <activation>
-        <os><family>windows</family></os>
-      </activation>
-      <properties>
-        <javafx.platform>win</javafx.platform>
-      </properties>
-    </profile>
-
-    <profile>
-      <id>javafx-mac</id>
-      <activation>
-        <os><family>mac</family></os>
-      </activation>
-      <properties>
-        <!-- Covers both x86-64 and aarch64 Macs at the cost of using the
-             x86-64 jar on Apple Silicon; use -Djavafx.platform=mac-aarch64
-             to get the native ARM build on M-series Macs. -->
-        <javafx.platform>mac</javafx.platform>
-      </properties>
-    </profile>
-
-    <profile>
-      <id>javafx-linux</id>
-      <activation>
-        <!-- Activate when neither windows nor mac matched -->
-        <os><name>Linux</name></os>
-      </activation>
-      <properties>
-        <javafx.platform>linux</javafx.platform>
-      </properties>
-    </profile>
-  </profiles>
 
   <dependencyManagement>
     <dependencies>
