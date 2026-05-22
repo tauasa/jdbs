@@ -1,11 +1,11 @@
 package org.tauasa.apps.jdbs;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.tauasa.apps.jdbs.cli.CliRunner;
 import org.tauasa.apps.jdbs.gui.JdbsApp;
 import org.tauasa.apps.jdbs.server.ServerConfig;
-
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * JDBS entry point.
@@ -23,7 +23,7 @@ public class Main {
 
     public static final String APP_NAME    = "JDBS – Java Debug Bridge Server";
     public static final String APP_VERSION = "1.0.0";
-    public static final String COPYRIGHT   = "© 2024 Tauasa Timoteo";
+    public static final String COPYRIGHT   = "© 2026 Tauasa Timoteo";
     public static final String GITHUB_URL  = "https://github.com/tauasa/jdbs";
 
     public static void main(String[] args) {
