@@ -1,13 +1,12 @@
-<img src="docs/logo.svg" alt="JDBS – Java Debug Bridge Server" width="520"/>
+<img src="docs/logo.svg" alt="JDBS – Java Debug Bridge Server"/>
 
-# JDBS – Java Debug Bridge Server
+## JDBS – Java Debug Bridge Server
 
-A lightweight TCP debug-logging server for Java applications.  
-Clients connect over a plain TCP socket and stream structured JSON log events —  
-including **optional PNG/JPG image attachments** — to the server in real time.
+A lightweight TCP debug-logging server for Java applications. Clients connect over a plain TCP socket and stream structured JSON log events — including **optional PNG/JPG image attachments** — to the server in real time.
 
-The server runs either as a **JavaFX GUI** or a **headless CLI** process,  
-and integrates with **Log4j2**, **SLF4J/Logback**, or directly via a **lite API jar**.
+The server runs either as a **JavaFX GUI** or a **headless CLI** process, and integrates with **Log4j2**, **SLF4J/Logback**, or directly via a **lite API jar**.
+
+<img src="docs/screenshot.png" alt="JDBS – Java Debug Bridge Server"/>
 
 ---
 
@@ -41,9 +40,7 @@ Your App  →  Appender / JdbsClient  →  TCP :6218  →  JDBS Server
                                                         └─ CLI  (headless)
 ```
 
-Each log event is a single-line JSON object (**NDJSON**) written to the TCP  
-socket.  The server's `ClientHandler` splits on newlines and deserialises  
-into `LogEvent` objects, which are dispatched to the UI.
+Each log event is a single-line JSON object (**NDJSON**) written to the TCP socket.  The server's `ClientHandler` splits on newlines and deserializes into `LogEvent` objects, which are dispatched to the UI.
 
 ---
 
@@ -56,8 +53,7 @@ into `LogEvent` objects, which are dispatched to the UI.
 | Maven (build) | **3.8** |
 | JavaFX | bundled in fat jar |
 
-> **Apple Silicon (M-series):** pass `-Djavafx.platform=mac-aarch64` to Maven  
-> to pull the native ARM JavaFX jars.
+> **Apple Silicon (M-series):** pass `-Djavafx.platform=mac-aarch64` to Maven to pull the native ARM JavaFX jars.
 
 ---
 
