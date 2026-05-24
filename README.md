@@ -1,6 +1,4 @@
-<img src="docs/logo.svg" alt="JDBS – Java Debug Bridge Server"/>
-
-## JDBS – Java Debug Bridge Server
+# JDBS – Java Debug Bridge Server
 
 A lightweight TCP debug-logging server for Java applications. Clients connect over a plain TCP socket and stream structured JSON log events — including **optional PNG/JPG image attachments** — to the server in real time.
 
