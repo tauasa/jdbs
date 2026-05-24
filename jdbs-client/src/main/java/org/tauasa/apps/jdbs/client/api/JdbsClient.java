@@ -4,6 +4,8 @@ import org.tauasa.apps.jdbs.client.JdbsClientConfig;
 import org.tauasa.apps.jdbs.client.JdbsClientConnection;
 import org.tauasa.apps.jdbs.client.JdbsClientEvent;
 
+import java.net.InetAddress;
+
 /**
  * Lightweight JDBS client API.
  *
@@ -43,9 +45,27 @@ public final class JdbsClient implements AutoCloseable {
 
     private final JdbsClientConnection connection;
 
+    /**
+     * Local IP address of this client process, resolved once at construction and
+     * embedded in every outgoing event.  The server will always override this with
+     * the authoritative remote-socket address, but having it in the payload is
+     * useful when events are forwarded through a proxy or NAT gateway.
+     */
+    private final String localIp;
+
     private JdbsClient(JdbsClientConfig config) {
         this.connection = new JdbsClientConnection(config);
+        this.localIp    = resolveLocalIp();
         this.connection.start();
+    }
+
+    /** Resolve the local host address once; fall back to "127.0.0.1" on any error. */
+    private static String resolveLocalIp() {
+        try {
+            return InetAddress.getLocalHost().getHostAddress();
+        } catch (Exception e) {
+            return "127.0.0.1";
+        }
     }
 
     // ── Factory methods ───────────────────────────────────────────────────────────
@@ -125,6 +145,8 @@ public final class JdbsClient implements AutoCloseable {
                 logger,
                 Thread.currentThread().getName(),
                 message);
+
+        event.setClientIp(localIp);   // populated from local address; server will override
 
         if (imageBytes != null && imageBytes.length > 0) {
             event.setImageBytes(imageBytes, format);

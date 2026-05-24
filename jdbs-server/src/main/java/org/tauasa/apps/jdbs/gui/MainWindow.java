@@ -24,62 +24,78 @@ import javafx.stage.Stage;
 import org.tauasa.apps.jdbs.Main;
 import org.tauasa.apps.jdbs.model.LogEvent;
 import org.tauasa.apps.jdbs.server.JdbsServer;
+import org.tauasa.apps.jdbs.server.JdbsServer.ClientInfo;
 import org.tauasa.apps.jdbs.server.JdbsServer.ConnectionStats;
 import org.tauasa.apps.jdbs.server.ServerConfig;
 
+import java.awt.Toolkit;
 import java.io.*;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.List;
 
 /**
  * Primary JDBS application window.
  *
- * <h3>Status bar layout</h3>
+ * <h3>Layout</h3>
  * <pre>
- *   [status message …]          Now: N | Peak: N | Total: N | Events: N | Port: N
+ *  ┌─ MenuBar ─────────────────────────────────────────────────┐
+ *  ├─ ToolBar (level filter, search, clear) ───────────────────┤
+ *  ├─ TabPane ─────────────────────────────────────────────────┤
+ *  │   Tab 0 "Log Events" : SplitPane(table | detail pane)    │
+ *  │   Tab 1 "Connections": client table + Disconnect button   │
+ *  ├─ StatusBar: [message …]  Now:N | Peak:N | Total:N | … ───┤
+ *  └───────────────────────────────────────────────────────────┘
  * </pre>
  */
 public class MainWindow {
 
-    // ── Constants ────────────────────────────────────────────────────────────────
+    // ── Constants ─────────────────────────────────────────────────────────────────
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter CONN_FMT =
+            DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
     private static final int MAX_DISPLAY_EVENTS = 20_000;
 
-    // ── Dependencies ─────────────────────────────────────────────────────────────
+    // ── Dependencies ──────────────────────────────────────────────────────────────
     private final Stage        stage;
     private final ServerConfig config;
     private final HostServices hostServices;
     private       JdbsServer   server;
 
-    // ── Data ─────────────────────────────────────────────────────────────────────
-    private final ObservableList<LogEvent> allEvents     = FXCollections.observableArrayList();
-    private       FilteredList<LogEvent>   filteredEvents;
+    // ── Data ──────────────────────────────────────────────────────────────────────
+    private final ObservableList<LogEvent>  allEvents     = FXCollections.observableArrayList();
+    private final ObservableList<ClientInfo> clientInfos  = FXCollections.observableArrayList();
+    private       FilteredList<LogEvent>    filteredEvents;
 
-    // ── UI – top controls ─────────────────────────────────────────────────────────
+    // ── UI – toolbar ──────────────────────────────────────────────────────────────
     private Scene            scene;
-    private TableView<LogEvent> tableView;
     private ComboBox<String> levelFilter;
     private TextField        searchField;
     private MenuItem         toggleThemeItem;
+    private Tab              connectionsTab;
     private boolean          autoScroll = true;
     private boolean          darkMode;
 
+    // ── UI – log table & detail ───────────────────────────────────────────────────
+    private TableView<LogEvent> logTable;
+    private TextArea            detailArea;
+    private ImageView           imagePreview;
+
+    // ── UI – connections table ────────────────────────────────────────────────────
+    private TableView<ClientInfo> connTable;
+
     // ── UI – status bar ───────────────────────────────────────────────────────────
-    private Label statusLabel;        // left side:  last server event message
-    private Label nowLabel;           // "Now: N"    – clients connected right now
-    private Label peakLabel;          // "Peak: N"   – most concurrent at any one time
-    private Label totalLabel;         // "Total: N"  – cumulative client connections
-    private Label eventCountLabel;    // "Events: N"
-    private Label portLabel;          // "Port: N"
+    private Label statusLabel;
+    private Label nowLabel;
+    private Label peakLabel;
+    private Label totalLabel;
+    private Label eventCountLabel;
+    private Label portLabel;
 
-    // ── UI – detail pane ─────────────────────────────────────────────────────────
-    private TextArea  detailArea;
-    private ImageView imagePreview;
-
-    // ── Constructor ──────────────────────────────────────────────────────────────
+    // ── Constructor ───────────────────────────────────────────────────────────────
     MainWindow(Stage stage, ServerConfig config, HostServices hostServices) {
         this.stage        = stage;
         this.config       = config;
@@ -87,26 +103,38 @@ public class MainWindow {
         this.darkMode     = config.isDarkMode();
     }
 
-    // ── Public API ───────────────────────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────────────
 
     void show() {
         stage.setTitle(Main.APP_NAME + "  v" + Main.APP_VERSION);
+        loadIcons();
 
         BorderPane root = new BorderPane();
         root.setTop(buildTop());
         root.setCenter(buildCenter());
         root.setBottom(buildStatusBar());
 
-        scene = new Scene(root, 1280, 800);
+        scene = new Scene(root, 1340, 820);
         applyTheme();
 
         stage.setScene(scene);
-        stage.setMinWidth(800);
-        stage.setMinHeight(500);
+        stage.setMinWidth(860);
+        stage.setMinHeight(540);
         stage.setOnCloseRequest(e -> { e.consume(); shutdown(); });
         stage.show();
 
         startServer();
+    }
+
+    // ── Icon loading ──────────────────────────────────────────────────────────────
+
+    private void loadIcons() {
+        int[] sizes = {16, 32, 48, 64, 128, 256};
+        for (int sz : sizes) {
+            String path = "/jdbs-icon-" + sz + ".png";
+            var stream = getClass().getResourceAsStream(path);
+            if (stream != null) stage.getIcons().add(new Image(stream));
+        }
     }
 
     // ── Layout builders ───────────────────────────────────────────────────────────
@@ -116,7 +144,7 @@ public class MainWindow {
     }
 
     private MenuBar buildMenuBar() {
-        // File
+        // ─── File ───
         MenuItem saveItem = new MenuItem("_Save…");
         saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN));
         saveItem.setOnAction(e -> saveLog());
@@ -128,7 +156,7 @@ public class MainWindow {
         Menu fileMenu = new Menu("_File");
         fileMenu.getItems().addAll(saveItem, new SeparatorMenuItem(), exitItem);
 
-        // Edit
+        // ─── Edit ───
         MenuItem settingsItem = new MenuItem("_Settings…");
         settingsItem.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.SHORTCUT_DOWN));
         settingsItem.setOnAction(e -> showSettings());
@@ -136,7 +164,7 @@ public class MainWindow {
         Menu editMenu = new Menu("_Edit");
         editMenu.getItems().add(settingsItem);
 
-        // View
+        // ─── View ───
         toggleThemeItem = new MenuItem(darkMode ? "Light Mode" : "Dark Mode");
         toggleThemeItem.setOnAction(e -> toggleTheme());
 
@@ -149,9 +177,10 @@ public class MainWindow {
         autoScrollItem.selectedProperty().addListener((obs, o, n) -> autoScroll = n);
 
         Menu viewMenu = new Menu("_View");
-        viewMenu.getItems().addAll(toggleThemeItem, new SeparatorMenuItem(), clearItem, autoScrollItem);
+        viewMenu.getItems().addAll(toggleThemeItem, new SeparatorMenuItem(),
+                clearItem, autoScrollItem);
 
-        // Help
+        // ─── Help ───
         MenuItem aboutItem = new MenuItem("_About JDBS…");
         aboutItem.setOnAction(e -> showAbout());
 
@@ -174,14 +203,16 @@ public class MainWindow {
         searchField.setPromptText("Search messages / logger…");
         searchField.setPrefWidth(260);
         searchField.textProperty().addListener((obs, o, n) -> applyFilter());
-        searchField.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) searchField.clear(); });
+        searchField.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) searchField.clear();
+        });
 
-        Button clearBtn = new Button("Clear");
-        clearBtn.setTooltip(new Tooltip("Clear all log events (Ctrl+K)"));
+        Button clearBtn  = new Button("Clear");
+        clearBtn.setTooltip(new Tooltip("Clear all log events (⌘K / Ctrl+K)"));
         clearBtn.setOnAction(e -> clearLog());
 
         Button tailBtn = new Button("↓ Tail");
-        tailBtn.setTooltip(new Tooltip("Scroll to latest event"));
+        tailBtn.setTooltip(new Tooltip("Jump to latest event"));
         tailBtn.setOnAction(e -> scrollToBottom());
 
         return new ToolBar(
@@ -193,19 +224,38 @@ public class MainWindow {
         );
     }
 
-    private SplitPane buildCenter() {
-        // ── Filtered table ────────────────────────────────────────────────────
+    private TabPane buildCenter() {
+        Tab logTab = new Tab("Log Events", buildLogPane());
+        logTab.setClosable(false);
+        logTab.setTooltip(new Tooltip("Received log events"));
+
+        connectionsTab = new Tab("Connections  (0)", buildConnectionsPane());
+        connectionsTab.setClosable(false);
+        connectionsTab.setTooltip(new Tooltip("Currently connected JDBS clients"));
+
+        return new TabPane(logTab, connectionsTab);
+    }
+
+    // ─── Log Events tab ────────────────────────────────────────────────────────
+
+    private SplitPane buildLogPane() {
         filteredEvents = new FilteredList<>(allEvents, ev -> true);
-        tableView = new TableView<>(filteredEvents);
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        tableView.setTableMenuButtonVisible(true);
-        tableView.setPlaceholder(new Label("No log events yet – connect a JDBS client"));
+        logTable = new TableView<>(filteredEvents);
+        logTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        logTable.setTableMenuButtonVisible(true);
+        logTable.setPlaceholder(new Label("No log events yet – connect a JDBS client."));
 
         // Time
         TableColumn<LogEvent, String> timeCol = new TableColumn<>("Time");
         timeCol.setCellValueFactory(d ->
                 new SimpleStringProperty(TIME_FMT.format(Instant.ofEpochMilli(d.getValue().getTimestamp()))));
         timeCol.setPrefWidth(100); timeCol.setMinWidth(90); timeCol.setMaxWidth(120);
+
+        // Client IP – second column, stamped server-side
+        TableColumn<LogEvent, String> ipCol = new TableColumn<>("Client IP");
+        ipCol.setCellValueFactory(d ->
+                new SimpleStringProperty(d.getValue().getClientIp() != null ? d.getValue().getClientIp() : ""));
+        ipCol.setPrefWidth(110); ipCol.setMinWidth(90); ipCol.setMaxWidth(160);
 
         // Level – colour badge
         TableColumn<LogEvent, String> levelCol = new TableColumn<>("Level");
@@ -223,7 +273,7 @@ public class MainWindow {
             }
         });
 
-        // Logger (abbreviated)
+        // Logger
         TableColumn<LogEvent, String> loggerCol = new TableColumn<>("Logger");
         loggerCol.setCellValueFactory(d -> new SimpleStringProperty(abbreviate(d.getValue().getLoggerName())));
         loggerCol.setPrefWidth(200); loggerCol.setMinWidth(100);
@@ -243,10 +293,9 @@ public class MainWindow {
         imgCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().hasImage() ? "●" : ""));
         imgCol.setPrefWidth(36); imgCol.setMinWidth(30); imgCol.setMaxWidth(40);
 
-        tableView.getColumns().addAll(timeCol, levelCol, loggerCol, threadCol, msgCol, imgCol);
+        logTable.getColumns().addAll(timeCol, ipCol, levelCol, loggerCol, threadCol, msgCol, imgCol);
 
-        // Row-level background colouring
-        tableView.setRowFactory(tv -> new TableRow<>() {
+        logTable.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(LogEvent item, boolean empty) {
                 super.updateItem(item, empty);
@@ -256,13 +305,10 @@ public class MainWindow {
             }
         });
 
-        tableView.getSelectionModel().selectedItemProperty()
+        logTable.getSelectionModel().selectedItemProperty()
                 .addListener((obs, old, sel) -> updateDetailPane(sel));
 
-        // ── Detail pane ───────────────────────────────────────────────────────
-        VBox detailPane = buildDetailPane();
-
-        SplitPane split = new SplitPane(tableView, detailPane);
+        SplitPane split = new SplitPane(logTable, buildDetailPane());
         split.setOrientation(Orientation.VERTICAL);
         split.setDividerPositions(0.72);
         return split;
@@ -298,84 +344,174 @@ public class MainWindow {
         return new VBox(header, new Separator(), body);
     }
 
-    /**
-     * Status bar:
-     * <pre>
-     *   [status message …]   Now: N | Peak: N | Total: N | Events: N | Port: N
-     * </pre>
-     * "Now", "Peak", and "Total" give a complete picture of client connection
-     * activity since the server was started.
-     */
+    // ─── Connections tab ───────────────────────────────────────────────────────
+
+    private BorderPane buildConnectionsPane() {
+        connTable = new TableView<>(clientInfos);
+        connTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        connTable.setPlaceholder(new Label("No clients currently connected."));
+
+        // Address
+        TableColumn<ClientInfo, String> addrCol = new TableColumn<>("Remote Address");
+        addrCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().remoteAddress()));
+        addrCol.setPrefWidth(180);
+
+        // Connected since
+        TableColumn<ClientInfo, String> sinceCol = new TableColumn<>("Connected At");
+        sinceCol.setCellValueFactory(d ->
+                new SimpleStringProperty(CONN_FMT.format(d.getValue().connectedAt())));
+        sinceCol.setPrefWidth(100);
+
+        // Duration
+        TableColumn<ClientInfo, String> durCol = new TableColumn<>("Duration");
+        durCol.setCellValueFactory(d -> {
+            long secs = java.time.Duration.between(d.getValue().connectedAt(), Instant.now()).getSeconds();
+            return new SimpleStringProperty(formatDuration(secs));
+        });
+        durCol.setPrefWidth(90);
+
+        // Events received
+        TableColumn<ClientInfo, String> evtCol = new TableColumn<>("Events Recv'd");
+        evtCol.setCellValueFactory(d ->
+                new SimpleStringProperty(String.valueOf(d.getValue().eventCount())));
+        evtCol.setPrefWidth(110);
+
+        // Connection ID (shortened UUID)
+        TableColumn<ClientInfo, String> idCol = new TableColumn<>("Connection ID");
+        idCol.setCellValueFactory(d ->
+                new SimpleStringProperty(d.getValue().id().substring(0, 8) + "…"));
+        idCol.setMinWidth(100);
+
+        // Disconnect action column
+        TableColumn<ClientInfo, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setPrefWidth(120);
+        actionCol.setMinWidth(100);
+        actionCol.setMaxWidth(140);
+        actionCol.setCellFactory(col -> new TableCell<>() {
+            private final Button btn = new Button("⊗  Disconnect");
+
+            {
+                btn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; " +
+                             "-fx-font-size: 11; -fx-background-radius: 4; -fx-cursor: hand;");
+                btn.setOnAction(evt -> {
+                    ClientInfo ci = getTableView().getItems().get(getIndex());
+                    if (ci != null && server != null) {
+                        boolean done = server.terminateClient(ci.id());
+                        if (!done) {
+                            // Already gone – refresh will handle UI
+                        }
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setGraphic(empty ? null : btn);
+            }
+        });
+
+        connTable.getColumns().addAll(addrCol, sinceCol, durCol, evtCol, idCol, actionCol);
+
+        // Header bar
+        Label title = new Label("Connected Clients");
+        title.setFont(Font.font(null, FontWeight.SEMI_BOLD, 13));
+
+        Button disconnectAllBtn = new Button("Disconnect All");
+        disconnectAllBtn.setStyle(
+                "-fx-background-color: #922b21; -fx-text-fill: white; " +
+                "-fx-font-size: 11; -fx-background-radius: 4; -fx-cursor: hand;");
+        disconnectAllBtn.setTooltip(new Tooltip("Forcefully close all active client connections"));
+        disconnectAllBtn.setOnAction(e -> {
+            if (server == null) return;
+            // Snapshot IDs to avoid ConcurrentModificationException
+            List<String> ids = clientInfos.stream().map(ClientInfo::id).toList();
+            ids.forEach(server::terminateClient);
+        });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox header = new HBox(8, title, spacer, disconnectAllBtn);
+        header.setPadding(new Insets(8, 12, 8, 12));
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label hint = new Label("Click ⊗ Disconnect to terminate an individual connection.");
+        hint.setStyle("-fx-text-fill: #888; -fx-font-size: 11;");
+        hint.setPadding(new Insets(6, 12, 6, 12));
+
+        BorderPane pane = new BorderPane();
+        pane.setTop(new VBox(header, new Separator()));
+        pane.setCenter(connTable);
+        pane.setBottom(hint);
+        return pane;
+    }
+
+    // ─── Status bar ────────────────────────────────────────────────────────────
+
     private HBox buildStatusBar() {
         statusLabel     = new Label("Initialising…");
-
-        // ── Connection counters ───────────────────────────────────────────────
-        nowLabel   = styledStatLabel("Now: 0");
-        nowLabel.setTooltip(new Tooltip("Clients connected right now"));
-
-        peakLabel  = styledStatLabel("Peak: 0");
-        peakLabel.setTooltip(new Tooltip("Maximum concurrent clients since server start"));
-
-        totalLabel = styledStatLabel("Total: 0");
-        totalLabel.setTooltip(new Tooltip("Cumulative clients that have ever connected"));
-
-        // ── Other counters ────────────────────────────────────────────────────
-        eventCountLabel = styledStatLabel("Events: 0");
-        eventCountLabel.setTooltip(new Tooltip("Log events received in this session"));
-
-        portLabel = styledStatLabel("Port: " + config.getPort());
-        portLabel.setTooltip(new Tooltip("Server listening port"));
+        nowLabel        = statLabel("Now: 0");   nowLabel.setTooltip(new Tooltip("Currently connected clients"));
+        peakLabel       = statLabel("Peak: 0");  peakLabel.setTooltip(new Tooltip("Peak concurrent connections since start"));
+        totalLabel      = statLabel("Total: 0"); totalLabel.setTooltip(new Tooltip("Total cumulative client connections"));
+        eventCountLabel = statLabel("Events: 0");
+        portLabel       = statLabel("Port: " + config.getPort());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         HBox bar = new HBox(8,
                 statusLabel, spacer,
-                nowLabel,
-                new Separator(Orientation.VERTICAL),
-                peakLabel,
-                new Separator(Orientation.VERTICAL),
-                totalLabel,
-                new Separator(Orientation.VERTICAL),
-                eventCountLabel,
-                new Separator(Orientation.VERTICAL),
-                portLabel
-        );
+                nowLabel,   new Separator(Orientation.VERTICAL),
+                peakLabel,  new Separator(Orientation.VERTICAL),
+                totalLabel, new Separator(Orientation.VERTICAL),
+                eventCountLabel, new Separator(Orientation.VERTICAL),
+                portLabel);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(4, 10, 4, 10));
         bar.getStyleClass().add("status-bar");
         return bar;
     }
 
-    /** Small helper – consistent style for all status-bar stat labels. */
-    private Label styledStatLabel(String text) {
+    private Label statLabel(String text) {
         Label l = new Label(text);
         l.setStyle("-fx-font-size: 11;");
         return l;
     }
 
-    // ── Event handlers ────────────────────────────────────────────────────────────
+    // ── Event / callback handlers ─────────────────────────────────────────────────
 
-    /** Add a log event from any thread – always marshals to the JavaFX thread. */
     public void addEvent(LogEvent event) {
         Platform.runLater(() -> {
-            if (allEvents.size() >= MAX_DISPLAY_EVENTS) {
-                allEvents.remove(0, 1_000); // drop oldest 1 000 when full
-            }
+            if (allEvents.size() >= MAX_DISPLAY_EVENTS) allEvents.remove(0, 1_000);
             allEvents.add(event);
             eventCountLabel.setText("Events: " + allEvents.size());
-            if (autoScroll && !tableView.getItems().isEmpty())
-                tableView.scrollTo(tableView.getItems().size() - 1);
+            if (autoScroll && !logTable.getItems().isEmpty())
+                logTable.scrollTo(logTable.getItems().size() - 1);
         });
     }
 
-    /** Update all three client-counter labels from a {@link ConnectionStats} snapshot. */
     private void updateStats(ConnectionStats stats) {
         Platform.runLater(() -> {
-            nowLabel.setText("Now: "   + stats.current());
-            peakLabel.setText("Peak: " + stats.peak());
+            nowLabel.setText("Now: "    + stats.current());
+            peakLabel.setText("Peak: "  + stats.peak());
             totalLabel.setText("Total: "+ stats.total());
         });
+    }
+
+    private void updateClientList(List<ClientInfo> infos) {
+        Platform.runLater(() -> {
+            clientInfos.setAll(infos);
+            int n = infos.size();
+            connectionsTab.setText("Connections  (" + n + ")");
+        });
+    }
+
+    private void doBeep() {
+        // Run off the FX thread so the beep can't block rendering
+        Thread t = new Thread(() -> Toolkit.getDefaultToolkit().beep(), "jdbs-beep");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void applyFilter() {
@@ -386,10 +522,10 @@ public class MainWindow {
         filteredEvents.setPredicate(ev -> {
             if (minOrd >= 0 && levelOrdinal(ev.getLevel()) < minOrd) return false;
             if (!search.isEmpty()) {
-                boolean inMsg    = ev.getMessage()    != null && ev.getMessage().toLowerCase().contains(search);
-                boolean inLogger = ev.getLoggerName() != null && ev.getLoggerName().toLowerCase().contains(search);
-                boolean inThread = ev.getThread()     != null && ev.getThread().toLowerCase().contains(search);
-                if (!inMsg && !inLogger && !inThread) return false;
+                boolean m = ev.getMessage()    != null && ev.getMessage().toLowerCase().contains(search);
+                boolean l = ev.getLoggerName() != null && ev.getLoggerName().toLowerCase().contains(search);
+                boolean t = ev.getThread()     != null && ev.getThread().toLowerCase().contains(search);
+                if (!m && !l && !t) return false;
             }
             return true;
         });
@@ -398,21 +534,21 @@ public class MainWindow {
     private void updateDetailPane(LogEvent ev) {
         if (ev == null) { detailArea.clear(); imagePreview.setImage(null); return; }
         detailArea.setText(String.format(
-                "Time:    %s%n" +
-                "Level:   %s%n" +
-                "Logger:  %s%n" +
-                "Thread:  %s%n%n" +
+                "Time:      %s%n" +
+                "Client IP: %s%n" +
+                "Level:     %s%n" +
+                "Logger:    %s%n" +
+                "Thread:    %s%n%n" +
                 "Message:%n%s",
                 TIME_FMT.format(Instant.ofEpochMilli(ev.getTimestamp())),
+                ev.getClientIp() != null ? ev.getClientIp() : "unknown",
                 ev.getLevel(), ev.getLoggerName(), ev.getThread(), ev.getMessage()));
 
         if (ev.hasImage()) {
             try {
                 byte[] bytes = Base64.getDecoder().decode(ev.getImageBase64());
                 imagePreview.setImage(new Image(new ByteArrayInputStream(bytes)));
-            } catch (Exception e) {
-                imagePreview.setImage(null);
-            }
+            } catch (Exception e) { imagePreview.setImage(null); }
         } else {
             imagePreview.setImage(null);
         }
@@ -426,8 +562,8 @@ public class MainWindow {
     }
 
     private void scrollToBottom() {
-        if (!tableView.getItems().isEmpty())
-            tableView.scrollTo(tableView.getItems().size() - 1);
+        if (!logTable.getItems().isEmpty())
+            logTable.scrollTo(logTable.getItems().size() - 1);
     }
 
     private void saveLog() {
@@ -443,16 +579,17 @@ public class MainWindow {
             ConnectionStats stats = server != null ? server.getStats()
                     : new ConnectionStats(0, 0, 0);
             w.printf("# JDBS Log Export%n");
-            w.printf("# Exported:       %s%n", Instant.now());
-            w.printf("# Port:           %d%n", config.getPort());
-            w.printf("# Events:         %d%n", allEvents.size());
-            w.printf("# Clients (now):  %d%n", stats.current());
-            w.printf("# Clients (peak): %d%n", stats.peak());
-            w.printf("# Clients (total):%d%n%n", stats.total());
+            w.printf("# Exported:        %s%n", Instant.now());
+            w.printf("# Port:            %d%n", config.getPort());
+            w.printf("# Events:          %d%n", allEvents.size());
+            w.printf("# Clients (now):   %d%n", stats.current());
+            w.printf("# Clients (peak):  %d%n", stats.peak());
+            w.printf("# Clients (total): %d%n%n", stats.total());
 
             for (LogEvent ev : allEvents) {
-                w.printf("[%s] %-5s [%s] [%s] %s%n",
+                w.printf("[%s] [%s] %-5s [%s] [%s] %s%n",
                         TIME_FMT.format(Instant.ofEpochMilli(ev.getTimestamp())),
+                        ev.getClientIp() != null ? ev.getClientIp() : "unknown",
                         ev.getLevel(), ev.getLoggerName(), ev.getThread(), ev.getMessage());
                 if (ev.hasImage())
                     w.printf("        <image: %s, %d chars base64>%n",
@@ -490,8 +627,10 @@ public class MainWindow {
     private void startServer() {
         server = new JdbsServer(config);
         server.setEventListener(this::addEvent);
-        server.setStatusListener(msg  -> Platform.runLater(() -> statusLabel.setText(msg)));
+        server.setStatusListener(msg -> Platform.runLater(() -> statusLabel.setText(msg)));
         server.setStatsListener(this::updateStats);
+        server.setClientListListener(this::updateClientList);
+        server.setBeepListener(this::doBeep);
 
         try {
             server.start();
@@ -510,7 +649,6 @@ public class MainWindow {
 
     // ── Helpers ───────────────────────────────────────────────────────────────────
 
-    /** Abbreviates a dotted logger name: com.example.foo.Bar → c.e.f.Bar */
     private String abbreviate(String name) {
         if (name == null) return "";
         String[] parts = name.split("\\.");
@@ -546,6 +684,15 @@ public class MainWindow {
             case "ERROR" -> "-fx-background-color:#fadbd8;-fx-text-fill:#c0392b;";
             default      -> "";
         };
+    }
+
+    private String formatDuration(long totalSeconds) {
+        long h = totalSeconds / 3600;
+        long m = (totalSeconds % 3600) / 60;
+        long s = totalSeconds % 60;
+        if (h > 0)  return String.format("%dh %02dm", h, m);
+        if (m > 0)  return String.format("%dm %02ds", m, s);
+        return totalSeconds + "s";
     }
 
     private void showError(String title, String msg) {

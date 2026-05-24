@@ -1,5 +1,6 @@
 package org.tauasa.apps.jdbs.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p>Field names are intentionally short to minimise wire-format JSON size:
  * <pre>
  *   t    – timestamp (epoch millis)
+ *   ip   – client IP address (stamped by the server from the accepted socket)
  *   l    – level (TRACE | DEBUG | INFO | WARN | ERROR)
  *   n    – logger name
  *   th   – thread name
@@ -17,6 +19,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *   img  – base64-encoded image bytes (optional)
  *   ifmt – image format ("PNG" or "JPG")  (optional, only when img is present)
  * </pre>
+ *
+ * <p>{@code clientIp} is <em>not</em> parsed from the JSON payload — it is
+ * always set server-side in {@code ClientHandler} from the accepted
+ * {@link java.net.Socket}, so it cannot be spoofed by a client.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -24,6 +30,13 @@ public class LogEvent {
 
     @JsonProperty("t")
     private long timestamp;
+
+    /**
+     * IP address of the client that sent this event.
+     * Set by the server from the TCP socket — never parsed from the client payload.
+     */
+    @JsonIgnore
+    private String clientIp;
 
     @JsonProperty("l")
     private String level;
@@ -62,6 +75,9 @@ public class LogEvent {
     public long getTimestamp()      { return timestamp; }
     public void setTimestamp(long v){ this.timestamp = v; }
 
+    public String getClientIp()          { return clientIp; }
+    public void   setClientIp(String v)  { this.clientIp = v; }
+
     public String getLevel()        { return level; }
     public void setLevel(String v)  { this.level = v; }
 
@@ -86,6 +102,6 @@ public class LogEvent {
 
     @Override
     public String toString() {
-        return String.format("[%s] [%s] %s – %s", timestamp, level, loggerName, message);
+        return String.format("[%s] [%s] [%s] %s – %s", timestamp, level, clientIp, loggerName, message);
     }
 }
