@@ -23,7 +23,8 @@ The server runs either as a **JavaFX GUI** or a **headless CLI** process, and in
 8. [Sending Images](#sending-images)  
 9. [GUI Reference](#gui-reference)  
 10. [Protocol Reference](#protocol-reference)  
-11. [Project Structure](#project-structure)  
+11. [Project Structure](#project-structure)
+12. [Examples](https://github.com/tauasa/jdbs-hello-world)
 
 ---
 
