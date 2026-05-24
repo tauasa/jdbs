@@ -1,20 +1,15 @@
 package org.tauasa.apps.jdbs.gui;
 
-import org.tauasa.apps.jdbs.Main;
-
 import javafx.application.HostServices;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.Hyperlink;
-import javafx.scene.control.Label;
-import javafx.scene.control.Separator;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Window;
+import org.tauasa.apps.jdbs.Main;
 
 /**
  * "Help → About JDBS" modal dialog.
@@ -53,7 +48,7 @@ public class AboutDialog {
         Label copyrightLabel = new Label(Main.COPYRIGHT);
         copyrightLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 11;");
 
-        Hyperlink githubLink = new Hyperlink(Main.GITHUB_URL);
+        Hyperlink githubLink = new Hyperlink("Source code on GitHub");
         githubLink.setOnAction(e -> {
             if (hostServices != null) {
                 hostServices.showDocument(Main.GITHUB_URL);

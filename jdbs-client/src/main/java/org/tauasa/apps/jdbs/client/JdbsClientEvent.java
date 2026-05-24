@@ -12,6 +12,8 @@ import java.util.Base64;
  * <p>Short field names keep JSON payload size minimal:
  * <pre>
  *   t    – timestamp (epoch millis)
+ *   ip   – client IP address (optional; the server always stamps this from
+ *           the accepted socket regardless of what the client sends)
  *   l    – level string (TRACE|DEBUG|INFO|WARN|ERROR)
  *   n    – logger name
  *   th   – thread name
@@ -23,11 +25,12 @@ import java.util.Base64;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class JdbsClientEvent {
 
-    @JsonProperty("t")  private long   timestamp;
-    @JsonProperty("l")  private String level;
-    @JsonProperty("n")  private String loggerName;
-    @JsonProperty("th") private String thread;
-    @JsonProperty("m")  private String message;
+    @JsonProperty("t")    private long   timestamp;
+    @JsonProperty("ip")   private String clientIp;
+    @JsonProperty("l")    private String level;
+    @JsonProperty("n")    private String loggerName;
+    @JsonProperty("th")   private String thread;
+    @JsonProperty("m")    private String message;
     @JsonProperty("img")  private String imageBase64;
     @JsonProperty("ifmt") private String imageFormat;
 
@@ -75,6 +78,8 @@ public class JdbsClientEvent {
     // ── Getters ───────────────────────────────────────────────────────────────────
 
     public long   getTimestamp()   { return timestamp; }
+    public String getClientIp()    { return clientIp; }
+    public void   setClientIp(String v) { this.clientIp = v; }
     public String getLevel()       { return level; }
     public String getLoggerName()  { return loggerName; }
     public String getThread()      { return thread; }

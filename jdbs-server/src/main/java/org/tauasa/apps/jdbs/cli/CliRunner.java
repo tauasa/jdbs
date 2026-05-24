@@ -66,17 +66,19 @@ public class CliRunner {
 
     private void printEvent(LogEvent e) {
         String time   = TIME_FMT.format(Instant.ofEpochMilli(e.getTimestamp()));
+        String ip     = String.format("%-15s", e.getClientIp() != null ? e.getClientIp() : "unknown");
         String level  = String.format("%-5s", e.getLevel());
         String logger = shortenLogger(e.getLoggerName());
         String imgTag = e.hasImage() ? " " + GREY + "[" + e.getImageFormat() + "]" + RESET : "";
         String colour = levelColour(e.getLevel());
 
-        System.out.printf("%s%s%s %s%s%s %s[%s]%s %s[%s]%s %s%s%s%s%n",
-                GREY, time, RESET,
+        System.out.printf("%s%s%s %s%s%s %s%s%s %s[%s]%s %s[%s]%s %s%s%s%s%n",
+                GREY,         time,   RESET,
+                GREY,         ip,     RESET,
                 colour + BOLD, level, RESET,
-                GREY, logger, RESET,
-                GREY, e.getThread(), RESET,
-                colour, e.getMessage(), RESET,
+                GREY,         logger, RESET,
+                GREY,         e.getThread(), RESET,
+                colour,       e.getMessage(), RESET,
                 imgTag);
     }
 

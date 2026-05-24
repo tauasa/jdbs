@@ -8,6 +8,7 @@ import org.tauasa.apps.jdbs.model.LogEvent;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -15,85 +16,95 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
- * TCP server that accepts JDBS client connections and dispatches {@link LogEvent}s.
+ * TCP server – accepts JDBS client connections and dispatches {@link LogEvent}s.
  *
  * <h3>Connection statistics</h3>
  * <ul>
  *   <li><b>current</b>  – clients connected right now</li>
- *   <li><b>peak</b>     – maximum concurrent connections since the server started</li>
- *   <li><b>total</b>    – cumulative count of every client that has ever connected</li>
+ *   <li><b>peak</b>     – maximum concurrent connections since start</li>
+ *   <li><b>total</b>    – cumulative count of all ever-connected clients</li>
  * </ul>
  *
- * All three are surfaced via the {@link #setStatsListener(Consumer) stats listener}
- * callback so the GUI and CLI can display them without polling.
+ * <h3>Forced termination</h3>
+ * Call {@link #terminateClient(String)} with a client's UUID to close it
+ * immediately from the GUI.
  */
 public class JdbsServer {
 
     private static final Logger log = LoggerFactory.getLogger(JdbsServer.class);
 
-    // ── Connection statistics ────────────────────────────────────────────────────
+    // ── Nested types ─────────────────────────────────────────────────────────────
+
     /**
-     * Snapshot of the three connection counters, delivered to the stats listener
-     * every time any one of them changes.
+     * Immutable snapshot of one connected client's metadata, safe to hand to
+     * the UI thread without further synchronisation.
+     */
+    public record ClientInfo(
+            String  id,
+            String  remoteAddress,
+            Instant connectedAt,
+            long    eventCount) {}
+
+    /**
+     * Snapshot of aggregate connection counters delivered to the stats listener.
      */
     public record ConnectionStats(int current, int peak, int total) {
-        @Override
-        public String toString() {
-            return String.format("Connected: %d | Peak: %d | Total: %d", current, peak, total);
+        @Override public String toString() {
+            return "Now: " + current + "  Peak: " + peak + "  Total: " + total;
         }
     }
 
     // ── Fields ───────────────────────────────────────────────────────────────────
+
     private final ServerConfig config;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    private ServerSocket      serverSocket;
-    private ExecutorService   pool;
-    private volatile boolean  running = false;
+    private ServerSocket    serverSocket;
+    private ExecutorService pool;
+    private volatile boolean running = false;
 
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
 
-    /** Clients connected right now – derived from clients.size(), kept as AtomicInt for speed. */
     private final AtomicInteger currentClients = new AtomicInteger(0);
-    /** Highest value currentClients has ever reached. */
     private final AtomicInteger peakClients    = new AtomicInteger(0);
-    /** Cumulative number of clients that have ever connected (never decremented). */
     private final AtomicInteger totalClients   = new AtomicInteger(0);
 
-    // ── Callbacks ────────────────────────────────────────────────────────────────
-    private Consumer<LogEvent>        eventListener;
-    private Consumer<String>          statusListener;
-    private Consumer<ConnectionStats> statsListener;
+    // ── Callbacks ─────────────────────────────────────────────────────────────────
 
-    // ── Constructor ──────────────────────────────────────────────────────────────
+    private Consumer<LogEvent>         eventListener;
+    private Consumer<String>           statusListener;
+    private Consumer<ConnectionStats>  statsListener;
+    /** Fires whenever the active-client list changes (connect or disconnect). */
+    private Consumer<List<ClientInfo>> clientListListener;
+    /** Fires when a new client connects AND beep-on-connect is enabled. */
+    private Runnable                   beepListener;
+
+    // ── Constructor ───────────────────────────────────────────────────────────────
+
     public JdbsServer(ServerConfig config) {
         this.config = config;
     }
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────────
+    // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-    /**
-     * Starts the server on the configured port.
-     *
-     * @throws IOException if the port is already in use or cannot be opened.
-     */
     public void start() throws IOException {
         serverSocket = new ServerSocket(config.getPort());
         pool         = Executors.newFixedThreadPool(config.getMaxClients());
         running      = true;
 
-        Thread acceptThread = new Thread(this::acceptLoop, "jdbs-accept");
-        acceptThread.setDaemon(true);
-        acceptThread.start();
+        Thread t = new Thread(this::acceptLoop, "jdbs-accept");
+        t.setDaemon(true);
+        t.start();
 
         log.info("JDBS server started on port {}", config.getPort());
         notifyStatus("Server listening on port " + config.getPort());
-        notifyStats(); // publish zeroed stats on start
+        notifyStats();
+        notifyClientList();
     }
 
-    /** Gracefully shuts down the server and all active client connections. */
     public void stop() {
         if (!running) return;
         running = false;
@@ -113,12 +124,45 @@ public class JdbsServer {
         currentClients.set(0);
         notifyStatus("Server stopped");
         notifyStats();
+        notifyClientList();
         log.info("JDBS server stopped");
     }
 
-    public boolean isRunning() { return running; }
+    /**
+     * Forcefully closes the connection for the client with the given UUID.
+     *
+     * @param clientId the {@link ClientInfo#id()} of the target client
+     * @return {@code true} if a matching client was found and closed
+     */
+    public boolean terminateClient(String clientId) {
+        for (ClientHandler h : clients) {
+            if (h.getId().equals(clientId)) {
+                log.info("Forcefully terminating client {} ({})", clientId, h.getRemoteAddress());
+                h.close(); // causes the read-loop to exit → onClientDisconnected fires
+                return true;
+            }
+        }
+        return false;
+    }
 
-    // ── Internal ─────────────────────────────────────────────────────────────────
+    public boolean isRunning()             { return running; }
+    public int     getCurrentClientCount() { return currentClients.get(); }
+    public int     getPeakClientCount()    { return peakClients.get(); }
+    public int     getTotalClientCount()   { return totalClients.get(); }
+
+    public ConnectionStats getStats() {
+        return new ConnectionStats(currentClients.get(), peakClients.get(), totalClients.get());
+    }
+
+    /** Returns an immutable snapshot of all currently connected clients. */
+    public List<ClientInfo> getClientInfos() {
+        return clients.stream()
+                .map(h -> new ClientInfo(
+                        h.getId(), h.getRemoteAddress(), h.getConnectedAt(), h.getEventCount()))
+                .collect(Collectors.toUnmodifiableList());
+    }
+
+    // ── Internal ──────────────────────────────────────────────────────────────────
 
     private void acceptLoop() {
         while (running) {
@@ -126,28 +170,34 @@ public class JdbsServer {
                 Socket socket = serverSocket.accept();
 
                 if (currentClients.get() >= config.getMaxClients()) {
-                    log.warn("Max clients ({}) reached – rejecting {}", config.getMaxClients(),
-                            socket.getInetAddress().getHostAddress());
+                    log.warn("Max clients ({}) reached – rejecting {}",
+                            config.getMaxClients(), socket.getInetAddress().getHostAddress());
                     socket.close();
-                    notifyStatus("Connection rejected – max clients (" + config.getMaxClients() + ") reached");
+                    notifyStatus("Connection rejected – max clients ("
+                            + config.getMaxClients() + ") reached");
                     continue;
                 }
 
                 ClientHandler handler = new ClientHandler(socket, this, mapper);
                 clients.add(handler);
 
-                int now   = currentClients.incrementAndGet();
-                int total = totalClients.incrementAndGet();
-                // Update peak only if current exceeds previous peak (compare-and-set loop)
+                int now = currentClients.incrementAndGet();
+                totalClients.incrementAndGet();
                 peakClients.accumulateAndGet(now, Math::max);
 
                 pool.submit(handler);
 
                 log.info("Client connected: {} (now={} peak={} total={})",
                         socket.getInetAddress().getHostAddress(),
-                        now, peakClients.get(), total);
+                        now, peakClients.get(), totalClients.get());
                 notifyStatus("Client connected: " + socket.getInetAddress().getHostAddress());
                 notifyStats();
+                notifyClientList();
+
+                // Beep (only if setting is enabled)
+                if (config.isBeepOnConnect() && beepListener != null) {
+                    beepListener.run();
+                }
 
             } catch (IOException e) {
                 if (running) log.error("Accept-loop error", e);
@@ -155,47 +205,31 @@ public class JdbsServer {
         }
     }
 
-    /** Called by {@link ClientHandler} on the handler's thread after each parsed event. */
     void dispatchEvent(LogEvent event) {
         if (eventListener != null) eventListener.accept(event);
     }
 
-    /** Called by {@link ClientHandler} when the client's socket closes. */
     void onClientDisconnected(ClientHandler handler) {
         clients.remove(handler);
         int now = currentClients.decrementAndGet();
-        log.info("Client disconnected: {} (now={} peak={} total={})",
-                handler.getRemoteAddress(), now, peakClients.get(), totalClients.get());
+        log.info("Client disconnected: {} (now={} total-events={})",
+                handler.getRemoteAddress(), now, handler.getEventCount());
         notifyStatus("Client disconnected: " + handler.getRemoteAddress());
         notifyStats();
+        notifyClientList();
     }
 
     // ── Notification helpers ──────────────────────────────────────────────────────
 
-    private void notifyStatus(String msg) {
-        if (statusListener != null) statusListener.accept(msg);
-    }
-
-    private void notifyStats() {
-        if (statsListener != null) {
-            statsListener.accept(new ConnectionStats(
-                    currentClients.get(), peakClients.get(), totalClients.get()));
-        }
-    }
-
-    // ── Public read-only accessors ────────────────────────────────────────────────
-
-    public int getCurrentClientCount() { return currentClients.get(); }
-    public int getPeakClientCount()    { return peakClients.get(); }
-    public int getTotalClientCount()   { return totalClients.get(); }
-
-    public ConnectionStats getStats() {
-        return new ConnectionStats(currentClients.get(), peakClients.get(), totalClients.get());
-    }
+    private void notifyStatus(String msg)     { if (statusListener     != null) statusListener.accept(msg); }
+    private void notifyStats()                { if (statsListener      != null) statsListener.accept(getStats()); }
+    private void notifyClientList()           { if (clientListListener != null) clientListListener.accept(getClientInfos()); }
 
     // ── Callback setters ──────────────────────────────────────────────────────────
 
-    public void setEventListener(Consumer<LogEvent> listener)        { this.eventListener  = listener; }
-    public void setStatusListener(Consumer<String> listener)         { this.statusListener = listener; }
-    public void setStatsListener(Consumer<ConnectionStats> listener) { this.statsListener  = listener; }
+    public void setEventListener(Consumer<LogEvent>         l) { this.eventListener      = l; }
+    public void setStatusListener(Consumer<String>          l) { this.statusListener     = l; }
+    public void setStatsListener(Consumer<ConnectionStats>  l) { this.statsListener      = l; }
+    public void setClientListListener(Consumer<List<ClientInfo>> l) { this.clientListListener = l; }
+    public void setBeepListener(Runnable                    l) { this.beepListener       = l; }
 }
